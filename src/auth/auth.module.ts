@@ -9,7 +9,7 @@ import { UsersModule } from '../users/users.module.js';
 @Module({
   imports: [
     UsersModule,
-    PassportModule,
+    PassportModule.register({ defaultStrategy: 'jwt' }),
     JwtModule.register({}),
   ],
   controllers: [AuthController],

@@ -6,15 +6,14 @@ import {
 import { JwtService } from '@nestjs/jwt';
 import bcrypt from 'bcrypt';
 import { v4 as uuidv4 } from 'uuid';
+import { createHash } from 'crypto';
 import { UsersService } from '../users/users.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { RegisterDto } from './dto/register.dto.js';
 import { LoginDto } from './dto/login.dto.js';
 
-import type { StringValue } from 'ms';
-
 @Injectable()
-export class AuthService {  
+export class AuthService {
   constructor(
     private readonly usersService: UsersService,
     private readonly prisma: PrismaService,
@@ -59,19 +58,63 @@ export class AuthService {
     };
   }
 
+  async refresh(rawRefreshToken: string | undefined) {
+    if (!rawRefreshToken) {
+      throw new UnauthorizedException('Refresh token missing');
+    }
+
+    const tokenHash = this.hashToken(rawRefreshToken);
+
+    const storedToken = await this.prisma.refreshToken.findFirst({
+      where: { tokenHash, revokedAt: null },
+    });
+
+    if (!storedToken) {
+      throw new UnauthorizedException('Invalid refresh token');
+    }
+
+    if (storedToken.expiresAt < new Date()) {
+      throw new UnauthorizedException('Refresh token expired');
+    }
+
+    // Rotasi: token lama langsung di-revoke begitu dipakai
+    await this.prisma.refreshToken.update({
+      where: { id: storedToken.id },
+      data: { revokedAt: new Date() },
+    });
+
+    const accessToken = this.generateAccessToken(storedToken.userId);
+    const refreshToken = await this.generateAndStoreRefreshToken(
+      storedToken.userId,
+    );
+
+    return { accessToken, refreshToken };
+  }
+
+  async logout(rawRefreshToken: string | undefined) {
+    if (!rawRefreshToken) return;
+
+    const tokenHash = this.hashToken(rawRefreshToken);
+
+    await this.prisma.refreshToken.updateMany({
+      where: { tokenHash, revokedAt: null },
+      data: { revokedAt: new Date() },
+    });
+  }
+
   private generateAccessToken(userId: string) {
   return this.jwtService.sign(
     { sub: userId },
     {
       secret: process.env.JWT_SECRET,
-      expiresIn: (process.env.JWT_EXPIRES_IN ?? '15m') as StringValue,
-    },
+      expiresIn: process.env.JWT_EXPIRES_IN ?? '15m',
+    } as any,
   );
 }
 
   private async generateAndStoreRefreshToken(userId: string) {
     const rawToken = uuidv4();
-    const tokenHash = await bcrypt.hash(rawToken, 10);
+    const tokenHash = this.hashToken(rawToken);
 
     const expiresInDays = 7;
     const expiresAt = new Date();
@@ -86,5 +129,9 @@ export class AuthService {
     });
 
     return rawToken;
+  }
+
+  private hashToken(token: string): string {
+    return createHash('sha256').update(token).digest('hex');
   }
 }

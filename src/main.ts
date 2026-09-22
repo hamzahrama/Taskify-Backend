@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import cookieParser from 'cookie-parser';
@@ -21,8 +22,10 @@ async function bootstrap() {
   app.useGlobalFilters(new HttpExceptionFilter());
   app.useGlobalInterceptors(new LoggingInterceptor());
 
+  const frontendUrl = process.env.FRONTEND_URL;
+
   app.enableCors({
-    origin: process.env.FRONTEND_URL,
+    origin: frontendUrl ?? true,
     credentials: true,
   });
 

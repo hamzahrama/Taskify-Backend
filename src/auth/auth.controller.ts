@@ -12,12 +12,16 @@ import { AuthService } from './auth.service.js';
 import { RegisterDto } from './dto/register.dto.js';
 import { LoginDto } from './dto/login.dto.js';
 
+const isProductionCookie =
+  process.env.NODE_ENV === 'production' ||
+  (process.env.FRONTEND_URL ?? '').startsWith('https://');
+
 const REFRESH_COOKIE_OPTIONS = {
   httpOnly: true,
-  secure: true,
-  sameSite: 'none' as const,
+  secure: isProductionCookie,
+  sameSite: isProductionCookie ? 'none' : 'lax',
   maxAge: 7 * 24 * 60 * 60 * 1000,
-};
+} as const;
 
 @Controller('auth')
 export class AuthController {

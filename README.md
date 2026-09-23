@@ -28,8 +28,14 @@
 ## Project setup
 
 ```bash
-$ pnpm install
+$ npm install
+$ cp .env.example .env
 ```
+
+Set `DATABASE_URL`, `JWT_SECRET`, `JWT_REFRESH_SECRET`, `COOKIE_SECRET`, and
+`FRONTEND_URL` in `.env` before starting the application. The old Neon
+connection is not part of this project anymore; use a reachable local
+PostgreSQL database or the PostgreSQL service connected to Railway.
 
 ## Compile and run the project
 
@@ -56,6 +62,31 @@ $ pnpm run test:e2e
 # test coverage
 $ pnpm run test:cov
 ```
+
+The E2E tests require a reachable PostgreSQL database because they boot the
+complete NestJS application. Run them with the same `DATABASE_URL` used by the
+application:
+
+```bash
+npx prisma migrate deploy
+npm run test:e2e
+```
+
+## Railway deployment
+
+The repository includes `railway.json`. Configure the backend service with
+these variables in Railway:
+
+```text
+DATABASE_URL=${{Postgres.DATABASE_URL}}
+JWT_SECRET=<random-secret>
+JWT_REFRESH_SECRET=<random-secret>
+COOKIE_SECRET=<random-secret>
+FRONTEND_URL=<deployed-frontend-url>
+```
+
+Railway runs `npm run build`, which generates Prisma Client. The production
+start command runs `prisma migrate deploy` before starting NestJS.
 
 ## Deployment
 
